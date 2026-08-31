@@ -109,7 +109,7 @@ export function WeChatProfileMockup({
       {/* Main Mockup View */}
       <div className="flex justify-center">
         {/* Realistic iPhone / Mobile frame */}
-        <div className="w-full max-w-[390px] bg-slate-900 rounded-[44px] p-3.5 shadow-xl border-4 border-slate-300 ring-1 ring-slate-200 relative overflow-hidden">
+        <div className="w-full max-w-[390px] max-h-[80vh] bg-slate-900 rounded-[44px] p-3.5 shadow-xl border-4 border-slate-300 ring-1 ring-slate-200 relative overflow-hidden flex flex-col">
           {/* Dynamic Island / Speaker notch */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-30 flex items-center justify-between px-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-slate-900"></div>
@@ -117,7 +117,7 @@ export function WeChatProfileMockup({
           </div>
 
           {/* Phone Screen Canvas */}
-          <div className="bg-[#111111] rounded-[34px] overflow-hidden text-white min-h-[640px] flex flex-col pt-7 pb-4">
+          <div className="bg-[#111111] rounded-[34px] overflow-hidden text-white flex flex-col pt-7 pb-4 flex-1 min-h-0">
             {/* Status bar */}
             <div className="px-6 flex justify-between items-center text-[11px] font-medium text-slate-400 mb-2">
               <span>09:41</span>
@@ -187,7 +187,7 @@ export function WeChatProfileMockup({
             </div>
 
             {/* 3-Column Video Cover Grid (WeChat Channels layout) */}
-            <div className="p-1 flex-1 overflow-y-auto">
+            <div className="p-1 flex-1 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-3 gap-[2px]">
                 {slices.slice(0, simulationStep).map((slice, i) => (
                   <div

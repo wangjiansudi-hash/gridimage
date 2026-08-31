@@ -2,6 +2,27 @@ import JSZip from 'jszip';
 import { GridConfig, SliceItem, ExportSettings } from '../types';
 
 /**
+ * Sanitizes a user-supplied filename prefix so it cannot break out of the ZIP
+ * folder (zip-slip) or produce invalid/unsafe filenames.
+ * Strips path separators, parent-dir sequences, control chars, and reserved names.
+ */
+export function sanitizeFilenamePrefix(prefix: string): string {
+  if (!prefix) return '视频号封面';
+  let s = prefix;
+  // Remove path separators and NUL/control chars
+  s = s.replace(/[/\\]/g, '').replace(/[\x00-\x1f\x7f]/g, '');
+  // Collapse ".." sequences that remain after stripping separators
+  s = s.replace(/\.{2,}/g, '.');
+  // Trim leading dots/spaces and trailing dots/spaces (Windows dislikes trailing dots)
+  s = s.replace(/^[\s.]+/, '').replace(/[\s.]+$/, '');
+  // Collapse runs of whitespace
+  s = s.replace(/\s+/g, ' ');
+  // Limit length to keep filenames sane
+  if (s.length > 40) s = s.slice(0, 40).trim();
+  return s || '视频号封面';
+}
+
+/**
  * Generates initial equal split line coordinates for a given row and col count
  */
 export function getEqualSplitLines(rows: number, cols: number): { verticalLines: number[]; horizontalLines: number[] } {
@@ -57,7 +78,8 @@ export function calculateSliceBoxes(
         : displayOrder;
 
       const orderStr = String(displayOrder).padStart(2, '0');
-      const filename = `${prefix}_${orderStr}.${extension}`;
+      const safePrefix = sanitizeFilenamePrefix(prefix);
+      const filename = `${safePrefix}_${orderStr}.${extension}`;
 
       boxes.push({
         id: `slice-${r}-${c}`,

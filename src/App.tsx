@@ -46,11 +46,28 @@ export default function App() {
 
   // Handle image upload
   const handleImageSelected = useCallback((file: File) => {
+    // Guard: reject oversized files before decoding (prevents canvas memory exhaustion)
+    const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
+    const MAX_PIXELS = 100_000_000; // ~100 megapixels
+    if (file.size > MAX_FILE_BYTES) {
+      alert(`图片文件过大（${(file.size / 1024 / 1024).toFixed(1)} MB），超过 50 MB 上限，请压缩后重试。`);
+      return;
+    }
+
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.src = objectUrl;
 
     img.onload = () => {
+      // Guard: reject decoded images whose pixel count would blow up canvas memory
+      if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+        URL.revokeObjectURL(objectUrl);
+        alert(
+          `图片分辨率过大（${img.naturalWidth}×${img.naturalHeight} = ${((img.naturalWidth * img.naturalHeight) / 1e6).toFixed(1)} MP），超过 100 MP 上限，请缩小后重试。`
+        );
+        return;
+      }
+
       // Auto-detect optimal row preset based on image aspect ratio
       const aspect = img.naturalWidth / img.naturalHeight;
       let initialRows = 1;
@@ -88,6 +105,10 @@ export default function App() {
       // Clear previous slice results
       setSlices([]);
       setActiveTab('editor');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      alert('图片加载失败，可能文件已损坏或格式不受支持。');
     };
   }, []);
 

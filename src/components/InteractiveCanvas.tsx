@@ -52,15 +52,26 @@ export function InteractiveCanvas({
     if (!containerRef.current || !imageMeta.width || !imageMeta.height) return;
     const containerW = containerRef.current.clientWidth - 48;
     const containerH = containerRef.current.clientHeight - 48;
+    if (containerW <= 0 || containerH <= 0) return;
     const scaleW = containerW / imageMeta.width;
     const scaleH = containerH / imageMeta.height;
-    const fitScale = Math.min(scaleW, scaleH, 1);
+    // contain: fit entire image, no cropping. No upper cap so large images always shrink to fit.
+    const fitScale = Math.min(scaleW, scaleH);
     setZoom(Math.max(0.1, Number(fitScale.toFixed(3))));
     setPan({ x: 0, y: 0 });
   }, [imageMeta.width, imageMeta.height]);
 
   useEffect(() => {
     handleAutoFit();
+  }, [handleAutoFit]);
+
+  // Re-fit when the container's real size changes (flex layouts settle late, window resizes, etc.)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => handleAutoFit());
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [handleAutoFit]);
 
   // Handle zooming

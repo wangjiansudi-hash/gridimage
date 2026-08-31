@@ -78,16 +78,19 @@ export function PublishGuideModal({ isOpen, onClose }: PublishGuideModalProps) {
               <div className="space-y-1.5 text-[11px] text-slate-700 font-medium">
                 <div className="flex items-center gap-1.5">
                   <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">第 1 批 (先发):</span>
-                  <span>07, 08, 09 (底行)</span>
+                  <span>09 → 08 → 07 (底行，行内倒序)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">第 2 批 (次发):</span>
-                  <span>04, 05, 06 (中行)</span>
+                  <span>06 → 05 → 04 (中行，行内倒序)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">第 3 批 (最后发):</span>
-                  <span>01, 02, 03 (顶行)</span>
+                  <span>03 → 02 → 01 (顶行，行内倒序)</span>
                 </div>
+                <p className="text-[10px] text-slate-500 pt-1 leading-relaxed">
+                  原理：主页每行从左到右是「新→旧」，所以行内必须倒序发，才能拼出 01→02→03 的正确顺序。整体即从 09 连续发到 01。
+                </p>
               </div>
             </div>
           </div>
