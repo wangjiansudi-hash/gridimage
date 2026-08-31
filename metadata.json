@@ -1,0 +1,6 @@
+{
+  "name": "视频号多宫格封面智能切割工具",
+  "description": "专为微信视频号创作者打造的多宫格封面智能切割与排版工具，支持 1x3、2x3、3x3 及自定义长图智能等分切割、分割线微调、全分辨率批量无损导出与手机主页实时预览。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
