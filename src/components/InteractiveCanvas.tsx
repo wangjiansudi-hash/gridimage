@@ -48,14 +48,15 @@ export function InteractiveCanvas({
   const [showCoordinates, setShowCoordinates] = useState<boolean>(true);
 
   // Auto-fit zoom on mount or image change.
-  // 宽度优先策略：填满列宽，高度跟随图片宽高比（宽图矮、高图高），消除 contain 策略下
-  // 宽图在固定高容器里产生的上下大片留白。容器高度由 displayHeight 反推，见舞台容器 style。
+  // 宽度优先策略：按父级可用宽度算 zoom，图片填满列宽；容器宽高都跟随图片显示尺寸（同比例），
+  // 100% zoom 时刚好装下图片。用父级宽度而非 containerRef 自身宽度，避免
+  // "容器宽=图片宽→读自身宽算zoom→改图片宽→…" 的自反馈循环。
   const handleAutoFit = useCallback(() => {
-    if (!containerRef.current || !imageMeta.width || !imageMeta.height) return;
-    const containerW = containerRef.current.clientWidth - 48; // p-6
-    if (containerW <= 0) return;
-    // 宽度优先：填满列宽，高度跟随图片宽高比
-    const fitScale = containerW / imageMeta.width;
+    const parent = containerRef.current?.parentElement;
+    if (!parent || !imageMeta.width || !imageMeta.height) return;
+    const availableW = parent.clientWidth - 48; // p-6 padding
+    if (availableW <= 0) return;
+    const fitScale = availableW / imageMeta.width;
     setZoom(Math.max(0.1, Math.min(3, Number(fitScale.toFixed(3)))));
     setPan({ x: 0, y: 0 });
   }, [imageMeta.width, imageMeta.height]);
@@ -64,11 +65,10 @@ export function InteractiveCanvas({
     handleAutoFit();
   }, [handleAutoFit]);
 
-  // Re-fit when the container's WIDTH changes (flex layouts settle late, window resizes, etc.).
-  // 只观察宽度：高度是我们主动写入的（displayHeight+padding），若也观察高度会形成
-  // "设高度→RO触发→重算zoom→改高度→RO再触发" 的自反馈循环，导致容器高度异常膨胀。
+  // Re-fit when the 父级 WIDTH changes (flex layouts settle late, window resizes, etc.).
+  // 观察父级宽度：容器自身宽高都被我们主动写入，观察自身会自反馈循环。
   useEffect(() => {
-    const el = containerRef.current;
+    const el = containerRef.current?.parentElement;
     if (!el) return;
     let lastW = el.clientWidth;
     const ro = new ResizeObserver((entries) => {
@@ -250,11 +250,12 @@ export function InteractiveCanvas({
       </div>
 
       {/* Main Interactive Stage Container.
-          高度随图片显示高度自适应（imageMeta.height * zoom + 上下 padding），消除固定高容器下
-          宽图的上下留白。容器高度 = 内容高度，不产生内嵌滚动；高图时由页面整体滚动。
-          displayHeight 为 0 时首帧用 min-h 兜底。 */}
+          宽高都跟随图片显示尺寸（imageMeta × zoom + padding），容器与图片同比例，
+          100% zoom 时刚好装下图片，无横向拖拽、无上下留白。
+          displayW/H 为 0 时首帧用 min-h 兜底。 */}
       {(() => {
-        const displayHeight = imageMeta.height ? Math.round(imageMeta.height * zoom) : 0;
+        const displayW = imageMeta.width ? Math.round(imageMeta.width * zoom) : 0;
+        const displayH = imageMeta.height ? Math.round(imageMeta.height * zoom) : 0;
         return (
       <div
         ref={containerRef}
@@ -268,7 +269,9 @@ export function InteractiveCanvas({
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0)`,
           backgroundSize: '24px 24px',
-          height: displayHeight ? `${displayHeight + 48}px` : undefined,
+          width: displayW ? `${displayW + 48}px` : undefined,
+          height: displayH ? `${displayH + 48}px` : undefined,
+          maxWidth: '100%',
         }}
       >
         {/* Helper Hint */}
