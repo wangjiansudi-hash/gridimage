@@ -262,7 +262,7 @@ export function InteractiveCanvas({
         onMouseMove={handleContainerMouseMove}
         onMouseUp={handleContainerMouseUp}
         onMouseDown={handleContainerMouseDown}
-        className={`relative flex-1 min-h-[360px] bg-slate-900 overflow-hidden flex items-start justify-center p-6 select-none ${
+        className={`relative min-h-[360px] bg-slate-900 overflow-hidden flex items-start justify-center p-6 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
