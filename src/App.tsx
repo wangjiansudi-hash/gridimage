@@ -30,7 +30,7 @@ export default function App() {
     format: 'image/jpeg',
     quality: 0.95,
     prefix: '视频号封面',
-    publishOrderMode: 'sequential',
+    publishOrderMode: 'reverse_profile',
     outputSizeMode: 'original',
     includeReadme: true,
   });

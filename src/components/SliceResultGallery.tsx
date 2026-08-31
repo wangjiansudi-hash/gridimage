@@ -117,8 +117,8 @@ export function SliceResultGallery({
           <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
           <span>
             {exportSettings.publishOrderMode === 'reverse_profile'
-              ? '💡 已启用【主页拼图倒序模式】：请按照每张图注明的「发布顺序」从大到小发布，主页将完美拼合！'
-              : '💡 已按 01、02、03 顺序编号。如需主页拼合呈现，可参考排版指南按序发布。'}
+              ? '💡 已启用【主页拼图倒序模式】：从标注「发布顺序: 第 1 个」的图开始，按第 1 → 2 → 3 个依次发布，主页将完美拼合！'
+              : '💡 已按 01、02、03 正序编号（按编号顺序发布，主页拼图会倒序排列）。若要主页拼成完整海报，请切换为「主页拼图倒序模式」。'}
           </span>
         </div>
         <button
