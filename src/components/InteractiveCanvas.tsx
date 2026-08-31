@@ -242,7 +242,8 @@ export function InteractiveCanvas({
 
       {/* Main Interactive Stage Container.
           高度随图片显示高度自适应（imageMeta.height * zoom + 上下 padding），消除固定高容器下
-          宽图的上下留白；高图封顶 max-h 并纵向滚动。displayHeight 为 0 时首帧用 min-h 兜底。 */}
+          宽图的上下留白。容器高度 = 内容高度，不产生内嵌滚动；高图时由页面整体滚动。
+          displayHeight 为 0 时首帧用 min-h 兜底。 */}
       {(() => {
         const displayHeight = imageMeta.height ? Math.round(imageMeta.height * zoom) : 0;
         return (
@@ -252,7 +253,7 @@ export function InteractiveCanvas({
         onMouseMove={handleContainerMouseMove}
         onMouseUp={handleContainerMouseUp}
         onMouseDown={handleContainerMouseDown}
-        className={`relative flex-1 min-h-[360px] max-h-[70vh] bg-slate-900 overflow-y-auto overflow-x-hidden flex items-start justify-center p-6 select-none ${
+        className={`relative flex-1 min-h-[360px] bg-slate-900 overflow-hidden flex items-start justify-center p-6 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
