@@ -47,17 +47,16 @@ export function InteractiveCanvas({
   const [showSafeZone, setShowSafeZone] = useState<boolean>(true);
   const [showCoordinates, setShowCoordinates] = useState<boolean>(true);
 
-  // Auto-fit zoom on mount or image change
+  // Auto-fit zoom on mount or image change.
+  // 宽度优先策略：填满列宽，高度跟随图片宽高比（宽图矮、高图高），消除 contain 策略下
+  // 宽图在固定高容器里产生的上下大片留白。容器高度由 displayHeight 反推，见舞台容器 style。
   const handleAutoFit = useCallback(() => {
     if (!containerRef.current || !imageMeta.width || !imageMeta.height) return;
-    const containerW = containerRef.current.clientWidth - 48;
-    const containerH = containerRef.current.clientHeight - 48;
-    if (containerW <= 0 || containerH <= 0) return;
-    const scaleW = containerW / imageMeta.width;
-    const scaleH = containerH / imageMeta.height;
-    // contain: fit entire image, no cropping. No upper cap so large images always shrink to fit.
-    const fitScale = Math.min(scaleW, scaleH);
-    setZoom(Math.max(0.1, Number(fitScale.toFixed(3))));
+    const containerW = containerRef.current.clientWidth - 48; // p-6
+    if (containerW <= 0) return;
+    // 宽度优先：填满列宽，高度跟随图片宽高比
+    const fitScale = containerW / imageMeta.width;
+    setZoom(Math.max(0.1, Math.min(3, Number(fitScale.toFixed(3)))));
     setPan({ x: 0, y: 0 });
   }, [imageMeta.width, imageMeta.height]);
 
@@ -160,7 +159,7 @@ export function InteractiveCanvas({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl flex flex-col h-full overflow-hidden shadow-sm">
+    <div className="bg-white border border-slate-200/90 rounded-2xl flex flex-col overflow-hidden shadow-sm">
       {/* Canvas Top Bar Controls */}
       <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 z-10">
         <div className="flex items-center space-x-2">
@@ -241,19 +240,25 @@ export function InteractiveCanvas({
         </div>
       </div>
 
-      {/* Main Interactive Stage Container */}
+      {/* Main Interactive Stage Container.
+          高度随图片显示高度自适应（imageMeta.height * zoom + 上下 padding），消除固定高容器下
+          宽图的上下留白；高图封顶 max-h 并纵向滚动。displayHeight 为 0 时首帧用 min-h 兜底。 */}
+      {(() => {
+        const displayHeight = imageMeta.height ? Math.round(imageMeta.height * zoom) : 0;
+        return (
       <div
         ref={containerRef}
         id="interactive-canvas-container"
         onMouseMove={handleContainerMouseMove}
         onMouseUp={handleContainerMouseUp}
         onMouseDown={handleContainerMouseDown}
-        className={`relative flex-1 min-h-[480px] sm:min-h-[580px] bg-slate-900 overflow-hidden flex items-center justify-center p-6 select-none ${
+        className={`relative flex-1 min-h-[360px] max-h-[70vh] bg-slate-900 overflow-y-auto overflow-x-hidden flex items-start justify-center p-6 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0)`,
           backgroundSize: '24px 24px',
+          height: displayHeight ? `${displayHeight + 48}px` : undefined,
         }}
       >
         {/* Helper Hint */}
@@ -417,6 +422,8 @@ export function InteractiveCanvas({
           })}
         </div>
       </div>
+      );
+      })()}
 
       {/* Split Line Fine-Tuning Bar */}
       <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
