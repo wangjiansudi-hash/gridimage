@@ -250,9 +250,11 @@ export function InteractiveCanvas({
       </div>
 
       {/* Main Interactive Stage Container.
-          宽高都跟随图片显示尺寸（imageMeta × zoom + padding），容器与图片同比例，
-          100% zoom 时刚好装下图片，无横向拖拽、无上下留白。
-          displayW/H 为 0 时首帧用 min-h 兜底。 */}
+          宽高都跟随图片显示尺寸（imageMeta × zoom + padding），容器与图片同比例，fit 时刚好装下。
+          ⚠ img 布局尺寸是原始像素，仅靠 transform scale(origin-center) 视觉缩放。因此必须
+          items-center + justify-center 让超大布局盒在容器里居中（两侧对称溢出），缩放后的
+          可视图才落在可视区内。改成 items-start 会让布局盒中心被压到容器下方，图片整体
+          溢出可视区之下，只能靠拖拽才能看到——勿改。 */}
       {(() => {
         const displayW = imageMeta.width ? Math.round(imageMeta.width * zoom) : 0;
         const displayH = imageMeta.height ? Math.round(imageMeta.height * zoom) : 0;
@@ -263,7 +265,7 @@ export function InteractiveCanvas({
         onMouseMove={handleContainerMouseMove}
         onMouseUp={handleContainerMouseUp}
         onMouseDown={handleContainerMouseDown}
-        className={`relative min-h-[360px] bg-slate-900 overflow-hidden flex items-start justify-center p-6 select-none ${
+        className={`relative min-h-[200px] bg-slate-900 overflow-hidden flex items-center justify-center p-6 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
