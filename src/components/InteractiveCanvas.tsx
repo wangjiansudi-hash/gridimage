@@ -64,11 +64,20 @@ export function InteractiveCanvas({
     handleAutoFit();
   }, [handleAutoFit]);
 
-  // Re-fit when the container's real size changes (flex layouts settle late, window resizes, etc.)
+  // Re-fit when the container's WIDTH changes (flex layouts settle late, window resizes, etc.).
+  // 只观察宽度：高度是我们主动写入的（displayHeight+padding），若也观察高度会形成
+  // "设高度→RO触发→重算zoom→改高度→RO再触发" 的自反馈循环，导致容器高度异常膨胀。
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => handleAutoFit());
+    let lastW = el.clientWidth;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? el.clientWidth;
+      if (Math.round(w) !== Math.round(lastW)) {
+        lastW = w;
+        handleAutoFit();
+      }
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [handleAutoFit]);
