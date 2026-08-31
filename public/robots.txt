@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://grid.smartbid.site/sitemap.xml
+Host: https://grid.smartbid.site
