@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Scissors, HelpCircle, Sparkles, RefreshCw, Smartphone, Layers, LogIn, LogOut, UserRound, Gauge } from 'lucide-react';
 import { QuotaSnapshot } from '../utils/quota';
 
@@ -11,6 +12,7 @@ interface HeaderProps {
   quota: QuotaSnapshot | null;
   onLogin: () => void;
   onLogout: () => void;
+  onLogoutAll: () => void;
   onOpenQuota: () => void;
 }
 
@@ -24,8 +26,10 @@ export function Header({
   quota,
   onLogin,
   onLogout,
+  onLogoutAll,
   onOpenQuota,
 }: HeaderProps) {
+  const [logoutMenuOpen, setLogoutMenuOpen] = useState(false);
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -82,15 +86,48 @@ export function Header({
                 <UserRound className="w-3.5 h-3.5 text-blue-600" />
                 <span>{quota.user.phone_masked || quota.user.username}</span>
               </div>
-              <button
-                id="btn-logout"
-                type="button"
-                onClick={onLogout}
-                title="退出登录（清除本机登录信息；其他设备不受影响）"
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition border border-slate-200"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <div className="relative">
+                <button
+                  id="btn-logout"
+                  type="button"
+                  onClick={() => setLogoutMenuOpen((v) => !v)}
+                  title="退出登录"
+                  className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition border border-slate-200"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+                {logoutMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setLogoutMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1.5 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 overflow-hidden">
+                      <button
+                        id="btn-logout-app"
+                        type="button"
+                        onClick={() => {
+                          setLogoutMenuOpen(false);
+                          onLogout();
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                      >
+                        <span className="font-semibold">退出登录</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">仅本站，本机其他设备不受影响</span>
+                      </button>
+                      <button
+                        id="btn-logout-all"
+                        type="button"
+                        onClick={() => {
+                          setLogoutMenuOpen(false);
+                          onLogoutAll();
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition border-t border-slate-100"
+                      >
+                        <span className="font-semibold">退出所有设备</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">全家桶登出并吊销全部登录态</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           ) : (
             <button

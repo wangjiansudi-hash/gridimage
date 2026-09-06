@@ -3,6 +3,13 @@
 > 提出方：grid.smartbid.site（视频号封面切割工具）
 > 日期：2026-09-06
 > 优先级建议：R1 = P0，R2/R3 = P1
+>
+> **✅ 状态更新（2026-09-06 晚实测）**：R1 与 R2 均已上线——
+> - `GET /logout?redirect=<白名单地址>` 返回 302 正常回跳，无 redirect 返回 400；
+> - `POST /api/auth/logout` 后同一 token `verify` 返回 401（吊销生效；对照当日早间实测为仍 200）；
+> - `/login` 页 Auto-SSO 已自愈：弹回前先过 `/verify`，token 失效（过期/登出吊销/改密吊销）时
+>   就地清共享 cookie 并正常展示表单。
+> grid 侧已接入 `logoutEverywhere()`（与"应用内登出"并列为两个菜单项）。
 
 ## 一、背景与实测证据
 

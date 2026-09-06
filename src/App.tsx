@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { GridConfig, ImageMeta, SliceItem, ExportSettings } from './types';
 import { getEqualSplitLines, calculateSliceBoxes, executeSliceImage } from './utils/imageProcessor';
-import { initSSO, requireLogin, clearToken } from './utils/auth';
+import { initSSO, requireLogin, clearToken, logoutEverywhere } from './utils/auth';
 import { fetchQuotaSnapshot, consumeQuota, QuotaSnapshot } from './utils/quota';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -73,6 +73,11 @@ export default function App() {
     clearToken();
     refreshQuota();
   }, [refreshQuota]);
+
+  const handleLogoutAll = useCallback(() => {
+    // 全家桶登出：4A /logout 清会话 cookie 并吊销全部 token 后 302 回跳本页
+    logoutEverywhere();
+  }, []);
 
   const handleOpenQuotaModal = useCallback(() => {
     setQuotaModal({ open: true, serviceError: false });
@@ -240,6 +245,7 @@ export default function App() {
         quota={quota}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        onLogoutAll={handleLogoutAll}
         onOpenQuota={handleOpenQuotaModal}
       />
 

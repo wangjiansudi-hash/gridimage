@@ -5,6 +5,7 @@
 const TOKEN_KEY = 'access_token';
 const LOGOUT_FLAG_KEY = 'sso_logged_out';
 const LOGIN_URL = import.meta.env.VITE_LOGIN_URL || 'https://auth.smartbid.site/login';
+const LOGOUT_URL = import.meta.env.VITE_LOGOUT_URL || 'https://auth.smartbid.site/logout';
 
 function getCookie(name: string): string | null {
   const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
@@ -115,4 +116,12 @@ export function requireLogin(): void {
   }
   const currentUrl = window.location.href;
   window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentUrl)}`;
+}
+
+// 全家桶登出（4A R1 已上线）：跳转 4A 全局登出页——4A 清会话 cookie 并吊销
+// 该用户全部 token（R2 token_version）后 302 回跳当前页。跳转会中断本地
+// 审计 POST，无碍：4A 侧是真正的吊销。
+export function logoutEverywhere(): void {
+  clearToken();
+  window.location.href = `${LOGOUT_URL}?redirect=${encodeURIComponent(window.location.href)}`;
 }
