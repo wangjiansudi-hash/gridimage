@@ -102,6 +102,17 @@ export function clearToken(): void {
 
 // 需要身份时才调用：跳转到 4A 统一登录页，登录/注册完会自动带 sso_token 跳回当前页面
 export function requireLogin(): void {
+  // 4A 登录页的 Auto-SSO 块只认 sso_token cookie：cookie 在，就不展示表单、
+  // 直接把 cookie 里的 token 弹回来（用户永远看不到登录页）。
+  // 本标签页显式退出过的情况下，cookie 可能已被其他 smartbid 系页签重新下发，
+  // 因此跳转前再删一次，保证用户能看到登录表单（docs/APP_LOGOUT_GUIDE.md §2/§3）。
+  try {
+    if (sessionStorage.getItem(LOGOUT_FLAG_KEY)) {
+      deleteSsoCookie();
+    }
+  } catch {
+    /* ignore */
+  }
   const currentUrl = window.location.href;
   window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentUrl)}`;
 }

@@ -40,6 +40,8 @@ HTTP 200                                      # 依然有效，重复注销两�
 
 这是解决"退出后点登录秒弹回"的唯一手段——会话 cookie 在 auth 域且 HttpOnly，只有 4A 自己能清。
 
+> **2026-09-06 补充核实**：已核查 `/login` 页源码——Auto-SSO 逻辑**仅读取 `sso_token` cookie**（无 localStorage、无额外会话接口），cookie 在即 302 弹回。因此 4A 侧不存在其他需要清理的会话态：R1 清掉 `sso_token` + R2 吊销 token 即可彻底闭环。另建议登录页支持 `force=1` 之类参数跳过 Auto-SSO，供子应用"切换账号"场景使用。
+
 ### R2（P1）Token 吊销机制
 
 JWT 无状态导致"登出/改密/被封禁"都无法使已签发 token 失效。二选一：
