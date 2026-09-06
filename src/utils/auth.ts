@@ -5,7 +5,6 @@
 const TOKEN_KEY = 'access_token';
 const LOGOUT_FLAG_KEY = 'sso_logged_out';
 const LOGIN_URL = import.meta.env.VITE_LOGIN_URL || 'https://auth.smartbid.site/login';
-const AUTH_BASE = new URL(LOGIN_URL).origin;
 
 function getCookie(name: string): string | null {
   const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
@@ -83,9 +82,9 @@ export function clearToken(): void {
     /* ignore */
   }
   if (token) {
-    // 尽力通知 4A 注销服务端 token（单实例登录互斥下使其彻底失效）；
-    // 跨域或端点不可用时静默忽略，本地登出不受影响
-    void fetch(`${AUTH_BASE}/api/auth/logout`, {
+    // 通过本站服务端代理注销 4A token（浏览器直连 auth.smartbid.site 会被
+    // CORS preflight 拦截，请求发不出去）；失败静默，本地登出不受影响
+    void fetch('/api/auth/logout', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(3000),

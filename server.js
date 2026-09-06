@@ -32,6 +32,7 @@ const PORT = parseInt(process.env.PORT || '3990', 10);
 const HOST = process.env.HOST || '127.0.0.1';
 const QUOTA_DB = process.env.QUOTA_DB || path.join(__dirname, 'data', 'usage.json');
 const AUTH_VERIFY_URL = process.env.AUTH_VERIFY_URL || 'https://auth.smartbid.site/api/auth/verify';
+const AUTH_LOGOUT_URL = process.env.AUTH_LOGOUT_URL || 'https://auth.smartbid.site/api/auth/logout';
 const ANON_DAILY_LIMIT = parseInt(process.env.ANON_DAILY_LIMIT || '1', 10);
 const USER_DAILY_LIMIT = parseInt(process.env.USER_DAILY_LIMIT || '10', 10);
 const VERIFY_TIMEOUT_MS = parseInt(process.env.VERIFY_TIMEOUT_MS || '5000', 10);
@@ -315,6 +316,34 @@ const server = http.createServer(async (req, res) => {
       flushSoon();
       log(`consumed: ${payload.quota.scope} key=${payload.quota.scope === 'user' ? auth.user.id : clientIp(req)} used=${payload.quota.used}/${payload.quota.limit}`);
       send(res, 200, payload);
+      return;
+    }
+
+    // 注销代理：浏览器直连 4A 会被 CORS preflight 拦截（请求根本发不出去），
+    // 由本服务端转发才能真正让 4A 注销 token；顺带清掉本地 verify 缓存，
+    // 避免已注销 token 在缓存 TTL 内仍被视为有效
+    if (route === 'POST /api/auth/logout') {
+      const m = /^Bearer\s+(.+)$/i.exec(req.headers['authorization'] || '');
+      const token = m ? m[1].trim() : null;
+      if (!token) {
+        send(res, 401, { error: 'no_token' });
+        return;
+      }
+      let fourAStatus = 'unreachable';
+      try {
+        const resp = await fetch(AUTH_LOGOUT_URL, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+        });
+        fourAStatus = resp.status;
+        log(`4a logout forwarded: status=${resp.status} token=${maskToken(token)}`);
+      } catch (err) {
+        log(`4a logout forward failed: ${err.message} token=${maskToken(token)}`);
+      }
+      verifyCache.delete(token);
+      negCache.delete(token);
+      send(res, 200, { ok: true, four_a_status: fourAStatus });
       return;
     }
 
