@@ -11,16 +11,23 @@ function getCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-// 删除 4A 写在共享父域上的 sso_token cookie（覆盖 host-only / 父域各种写法）；
-// 不删的话 initSSO 的 cookie 兜底会把刚退出的登录态静默恢复回来
+// 删除 4A 写在共享父域上的 sso_token cookie。
+// 删除 = 写同名过期 cookie，浏览器按 name+domain+path 三者精确匹配覆盖，
+// 属性必须逐项对齐下发时的 path=/; domain=.smartbid.site（见 docs/APP_LOGOUT_GUIDE.md §3）：
+// 漏 domain 会造出 host-only 空 cookie、原 cookie 纹丝不动；写成本站 host 同样删不掉。
 function deleteSsoCookie(): void {
   const host = window.location.hostname;
   const labels = host.split('.');
   const parentDomain = labels.length >= 2 ? labels.slice(-2).join('.') : null;
-  const domains: (string | undefined)[] = [undefined, host];
-  if (parentDomain) domains.push(parentDomain, `.${parentDomain}`);
+  const domains: (string | undefined)[] = parentDomain
+    ? [parentDomain, `.${parentDomain}`]
+    : [undefined];
   for (const domain of domains) {
-    document.cookie = `sso_token=; Max-Age=0; Path=/${domain ? `; Domain=${domain}` : ''}`;
+    document.cookie = `sso_token=; Max-Age=0; path=/${domain ? `; domain=${domain}` : ''}`;
+  }
+  // 指南 §3 自查：非 HttpOnly，JS 应能确认已删除
+  if (getCookie('sso_token')) {
+    console.warn('[auth] sso_token cookie 清理失败，请按 docs/APP_LOGOUT_GUIDE.md §3 自查属性匹配');
   }
 }
 
@@ -73,7 +80,8 @@ export function getToken(): string | null {
 }
 
 export function clearToken(): void {
-  const token = localStorage.getItem(TOKEN_KEY);
+  // 审计/登出通知的 token 以 localStorage 为准，共享 cookie 兜底（登出指南 §2）
+  const token = localStorage.getItem(TOKEN_KEY) || getCookie('sso_token');
   localStorage.removeItem(TOKEN_KEY);
   deleteSsoCookie();
   try {
@@ -82,8 +90,8 @@ export function clearToken(): void {
     /* ignore */
   }
   if (token) {
-    // 通过本站服务端代理注销 4A token（浏览器直连 auth.smartbid.site 会被
-    // CORS preflight 拦截，请求发不出去）；失败静默，本地登出不受影响
+    // 通知 4A 记审计日志（尽力而为）；4A 约定 401（token 已失效）同样视为成功。
+    // 经本站服务端代理转发——浏览器直连 auth.smartbid.site 会被 CORS preflight 拦截
     void fetch('/api/auth/logout', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

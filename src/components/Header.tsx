@@ -86,7 +86,7 @@ export function Header({
                 id="btn-logout"
                 type="button"
                 onClick={onLogout}
-                title="退出登录（清除本站登录信息；4A 全家桶登录态不受影响）"
+                title="退出登录（清除本机登录信息；其他设备不受影响）"
                 className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition border border-slate-200"
               >
                 <LogOut className="w-4 h-4" />
