@@ -1,6 +1,8 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { GridConfig, ImageMeta, SliceItem, ExportSettings } from './types';
 import { getEqualSplitLines, calculateSliceBoxes, executeSliceImage } from './utils/imageProcessor';
+import { initSSO, requireLogin, clearToken } from './utils/auth';
+import { fetchQuotaSnapshot, consumeQuota, QuotaSnapshot } from './utils/quota';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { GridControls } from './components/GridControls';
@@ -8,6 +10,7 @@ import { InteractiveCanvas } from './components/InteractiveCanvas';
 import { SliceResultGallery } from './components/SliceResultGallery';
 import { WeChatProfileMockup } from './components/WeChatProfileMockup';
 import { PublishGuideModal } from './components/PublishGuideModal';
+import { QuotaModal } from './components/QuotaModal';
 import { Sparkles, Layers, RefreshCw, Scissors } from 'lucide-react';
 
 export default function App() {
@@ -43,6 +46,37 @@ export default function App() {
   // Active view tab & guide modal
   const [activeTab, setActiveTab] = useState<'editor' | 'profile_preview'>('editor');
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
+
+  // 4A 认证与切割额度（匿名 1 次/天/IP，认证 10 次/天）
+  const [quota, setQuota] = useState<QuotaSnapshot | null>(null);
+  const [quotaModal, setQuotaModal] = useState<{ open: boolean; serviceError: boolean }>({
+    open: false,
+    serviceError: false,
+  });
+
+  const refreshQuota = useCallback(async () => {
+    const snapshot = await fetchQuotaSnapshot();
+    setQuota(snapshot);
+  }, []);
+
+  // 页面加载：恢复 4A 登录态（URL token → localStorage → 跨子域 cookie）并拉取额度
+  useEffect(() => {
+    initSSO();
+    refreshQuota();
+  }, [refreshQuota]);
+
+  const handleLogin = useCallback(() => {
+    requireLogin();
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    clearToken();
+    refreshQuota();
+  }, [refreshQuota]);
+
+  const handleOpenQuotaModal = useCallback(() => {
+    setQuotaModal({ open: true, serviceError: false });
+  }, []);
 
   // Handle image upload
   const handleImageSelected = useCallback((file: File) => {
@@ -146,13 +180,30 @@ export default function App() {
     );
   }, [imageMeta, grid, exportSettings.publishOrderMode, exportSettings.prefix, exportSettings.format]);
 
-  // Trigger Slicing operation
+  // Trigger Slicing operation（先向服务端申请扣减 1 次额度，成功后才执行切割）
   const handleStartSlice = async () => {
-    if (!imageMeta?.imageElement) return;
+    if (!imageMeta?.imageElement || isProcessing) return;
     setIsProcessing(true);
     setProgress(0);
 
     try {
+      const gate = await consumeQuota();
+      if (gate.ok) {
+        setQuota(gate.snapshot);
+      } else if (gate.reason === 'quota_exceeded') {
+        setQuota(gate.snapshot);
+        setQuotaModal({ open: true, serviceError: false });
+        return;
+      } else {
+        // 额度服务不可达：开发环境放行，生产环境拦截（防止绕过配额）
+        if (import.meta.env.DEV) {
+          console.warn('[quota] 服务不可达，开发环境放行本次切割');
+        } else {
+          setQuotaModal({ open: true, serviceError: true });
+          return;
+        }
+      }
+
       const results = await executeSliceImage(
         imageMeta.imageElement,
         grid,
@@ -167,6 +218,15 @@ export default function App() {
     }
   };
 
+  // 额度提示文案（切割按钮下方）
+  const quotaHint = useMemo(() => {
+    if (!quota) return null;
+    if (quota.authenticated) {
+      return `认证账号今日还可切割 ${quota.quota.remaining} / ${quota.quota.limit} 次`;
+    }
+    return `匿名用户今日还可免费切割 ${quota.quota.remaining} / ${quota.quota.limit} 次 · 登录后每日 10 次`;
+  }, [quota]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* Top Navigation Header */}
@@ -177,6 +237,10 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         hasSlices={slices.length > 0}
+        quota={quota}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+        onOpenQuota={handleOpenQuotaModal}
       />
 
       {/* Main Content Area */}
@@ -208,6 +272,7 @@ export default function App() {
                   progress={progress}
                   calculatedSlices={calculatedSlices}
                   onOpenGuide={() => setIsGuideOpen(true)}
+                  quotaHint={quotaHint}
                 />
               </div>
 
@@ -245,6 +310,15 @@ export default function App() {
       <PublishGuideModal
         isOpen={isGuideOpen}
         onClose={() => setIsGuideOpen(false)}
+      />
+
+      {/* Quota / Login Modal */}
+      <QuotaModal
+        isOpen={quotaModal.open}
+        onClose={() => setQuotaModal((prev) => ({ ...prev, open: false }))}
+        snapshot={quota}
+        serviceError={quotaModal.serviceError}
+        onLogin={handleLogin}
       />
 
       {/* Footer */}

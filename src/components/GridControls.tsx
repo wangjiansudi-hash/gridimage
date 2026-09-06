@@ -26,6 +26,7 @@ interface GridControlsProps {
   progress: number;
   calculatedSlices: Omit<SliceItem, 'dataUrl' | 'blob'>[];
   onOpenGuide: () => void;
+  quotaHint?: string | null;
 }
 
 export function GridControls({
@@ -40,6 +41,7 @@ export function GridControls({
   progress,
   calculatedSlices,
   onOpenGuide,
+  quotaHint,
 }: GridControlsProps) {
   // Preset rows changer
   const handleSetRows = (rows: number) => {
@@ -408,7 +410,7 @@ export function GridControls({
           )}
         </button>
         <p className="text-[11px] text-center text-slate-500 mt-2">
-          保持 100% 原图分辨率 · 毫秒级极速渲染 · 自动排列
+          {quotaHint || '保持 100% 原图分辨率 · 毫秒级极速渲染 · 自动排列'}
         </p>
       </div>
     </div>

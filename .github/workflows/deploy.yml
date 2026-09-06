@@ -57,6 +57,11 @@ jobs:
           rsync -az --delete \
             -e "ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=15" \
             dist/ "$VPS_USER@$VPS_HOST:/var/www/grid/"
+          rsync -az \
+            -e "ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=15" \
+            server.js "$VPS_USER@$VPS_HOST:/var/www/grid/server.js"
+          ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$VPS_USER@$VPS_HOST" 'sudo -n systemctl restart grid-quota && systemctl is-active grid-quota'
           echo "rsync deploy done"
 
       - name: Health check
@@ -64,4 +69,7 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" https://grid.smartbid.site/robots.txt)
           echo "robots.txt -> $code"
           if [ "$code" != "200" ]; then echo "health check failed"; exit 1; fi
+          quota=$(curl -s -o /dev/null -w "%{http_code}" https://grid.smartbid.site/api/quota)
+          echo "/api/quota -> $quota"
+          if [ "$quota" != "200" ]; then echo "quota api health check failed"; exit 1; fi
           echo "health check passed"

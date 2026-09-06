@@ -4,19 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A pure-frontend React app that slices a long cover image into a grid of sub-images for WeChat Channels (微信视频号) creators. It supports 1×3 / 2×3 / 3×3 / custom grids, draggable cut-line micro-tuning, WeChat-publishing-order-aware filename numbering, ZIP export, and a phone-frame mockup that previews how the slices tile on a Channels profile page.
+A mostly-frontend React app that slices a long cover image into a grid of sub-images for WeChat Channels (微信视频号) creators. It supports 1×3 / 2×3 / 3×3 / custom grids, draggable cut-line micro-tuning, WeChat-publishing-order-aware filename numbering, ZIP export, and a phone-frame mockup that previews how the slices tile on a Channels profile page.
 
-The entire image pipeline runs client-side on `<canvas>` — there is no upload, no server image processing. The metadata.json `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` capability and the `.env.example` `GEMINI_API_KEY` are AI-Studio scaffold artifacts; **no AI/GenAI features are wired into the app**. Do not assume `@google/genai` is used — grep first.
+The image pipeline runs client-side on `<canvas>` — no upload, no server image processing. A small zero-dependency Node server ([server.js](server.js)) exists solely for **4A SSO authentication and daily slicing quotas** (anonymous: 1/day per IP; logged-in: 10/day per user). The metadata.json `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` capability and the `.env.example` `GEMINI_API_KEY` are AI-Studio scaffold artifacts; **no AI/GenAI features are wired into the app**. Do not assume `@google/genai` is used — grep first.
 
 ## Commands
 
 Package manager is **bun** (lockfile is `bun.lock`); npm/yarn also work.
 
-- `bun run dev` — Vite dev server on `http://0.0.0.0:3000`
+- `bun run dev` — Vite dev server on `http://0.0.0.0:3000` (proxies `/api/*` to `127.0.0.1:3990`)
 - `bun run build` — production build to `dist/`
 - `bun run preview` — preview the production build
 - `bun run lint` — typecheck only (`tsc --noEmit`). There is no ESLint config; "lint" === typecheck.
-- `bun run clean` — remove `dist/` and `server.js`
+- `bun run clean` — remove `dist/`
+- Local quota server for dev: `QUOTA_DB=./data/usage.json node server.js` (starts on port 3990)
 
 There is **no test runner** configured. Do not invent test commands.
 
@@ -34,6 +35,16 @@ Single-page React 19 + TypeScript + Vite + Tailwind v4 app. Path alias `@/*` →
 1. **`imageMeta: ImageMeta | null`** — the loaded source image (File + objectUrl + decoded `HTMLImageElement`). Created on upload/drop/paste/demo-load in [ImageUploader](src/components/ImageUploader.tsx); `objectUrl` is revoked on full reset.
 2. **`grid: GridConfig`** — `{ rows, cols, verticalLines[], horizontalLines[] }`. The `*Lines` arrays are **normalized ratios in [0,1]**, not pixels — a cut line at `0.3333` means "one third across." For `cols` columns there are `cols-1` vertical lines; for `rows` rows, `rows-1` horizontal lines. Components mutate these arrays directly and re-sort them after each edit (see `InteractiveCanvas` drag handlers and `nudgeLine`).
 3. **`exportSettings: ExportSettings`** — format/quality/prefix/publishOrderMode/outputSizeMode/includeReadme.
+4. **`quota: QuotaSnapshot | null`** — auth identity + today's remaining slicing quota, fetched from `/api/quota` on mount and refreshed after every slice attempt.
+
+### 4A SSO & slicing quota ([src/utils/auth.ts](src/utils/auth.ts), [src/utils/quota.ts](src/utils/quota.ts), [server.js](server.js))
+
+The app is a soft gate: anonymous browsing/upload is unrestricted; only the "start slice" action consumes quota.
+
+- **Client token flow** (`auth.ts`): `initSSO()` on mount recovers the token from `?sso_token=` URL param → `localStorage['access_token']` → cross-subdomain `sso_token` cookie (in that priority; URL token is cleaned from the address bar). `requireLogin()` redirects to `https://auth.smartbid.site/login?redirect=<current url>`; 4A redirects back with `?sso_token=`. Logout only clears the local token (4A holds no per-app session).
+- **Server** (`server.js`, systemd unit `grid-quota.service` on the VPS, listens `127.0.0.1:3990`, proxied by Caddy at `/api/*`): `GET /api/quota` (status) and `POST /api/quota/consume` (atomically burns 1 unit; 429 `{error:'quota_exceeded'}` when exhausted). Limits: anonymous **1/day keyed by `Cf-Connecting-Ip`**, authenticated **10/day keyed by 4A numeric user id**; day boundary is Asia/Shanghai midnight; state persisted to `/var/lib/grid-quota/usage.json` (7-day retention).
+- **Token verification** happens server-side against 4A `/api/auth/verify` with a 10-min positive cache / 60s negative cache. Follows the guide's cache rules: expired cache entry → delete and re-verify (never "expired cache = logged out"); verify network failure → fail open as anonymous, never 500. If the API reports `reason: 'token_invalid'`, the client clears its stored token.
+- **Consume gating** in `App.handleStartSlice`: consume succeeds → slice; `quota_exceeded` → QuotaModal (login CTA for anonymous); service unreachable → **fail closed in prod** (anti-bypass) but fail open in dev (`import.meta.env.DEV`) so local work without the quota server still functions.
 
 ### The slicing pipeline ([src/utils/imageProcessor.ts](src/utils/imageProcessor.ts))
 
@@ -53,6 +64,12 @@ This module is the core of the app; everything else is UI. Key invariants:
 - [SliceResultGallery.tsx](src/components/SliceResultGallery.tsx) — post-slice grid of thumbnails with per-slice download, copy-to-clipboard, full-ZIP download (JSZip + confetti), and a lightbox preview.
 - [WeChatProfileMockup.tsx](src/components/WeChatProfileMockup.tsx) — phone-frame simulation of a Channels profile page, tiling the slices into a 3-column grid with a play-by-play publishing simulation (`simulationStep` interval).
 - [PublishGuideModal.tsx](src/components/PublishGuideModal.tsx) — static explanatory modal on WeChat publishing order, aspect ratios, and safe zones.
+- [QuotaModal.tsx](src/components/QuotaModal.tsx) — quota/login modal shown on `quota_exceeded` or service outage; anonymous users get a login CTA (每日 10 次), logged-in users see usage/reset time.
+- [Header.tsx](src/components/Header.tsx) — also renders the auth area (`btn-login` / `auth-user-chip` + `btn-logout`) and the clickable quota badge (`btn-quota-status`) that opens QuotaModal.
+
+## Deployment
+
+Push to `main` → GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) rsyncs `dist/` + `server.js` to `/var/www/grid/` on the VPS, restarts `grid-quota.service`, then health-checks `robots.txt` and `/api/quota` on `https://grid.smartbid.site`. Caddy reverse-proxies `/api/*` → `127.0.0.1:3990` (see the `grid.smartbid.site` block in the VPS `/etc/caddy/Caddyfile`); everything else is static from `/var/www/grid`. Quota state lives in `/var/lib/grid-quota/usage.json` (survives deploys — don't delete it).
 
 ## Conventions
 

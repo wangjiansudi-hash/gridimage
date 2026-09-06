@@ -1,4 +1,5 @@
-import { Scissors, HelpCircle, Sparkles, RefreshCw, Smartphone, Layers } from 'lucide-react';
+import { Scissors, HelpCircle, Sparkles, RefreshCw, Smartphone, Layers, LogIn, LogOut, UserRound, Gauge } from 'lucide-react';
+import { QuotaSnapshot } from '../utils/quota';
 
 interface HeaderProps {
   onOpenGuide: () => void;
@@ -7,6 +8,10 @@ interface HeaderProps {
   activeTab: 'editor' | 'profile_preview';
   setActiveTab: (tab: 'editor' | 'profile_preview') => void;
   hasSlices: boolean;
+  quota: QuotaSnapshot | null;
+  onLogin: () => void;
+  onLogout: () => void;
+  onOpenQuota: () => void;
 }
 
 export function Header({
@@ -16,6 +21,10 @@ export function Header({
   activeTab,
   setActiveTab,
   hasSlices,
+  quota,
+  onLogin,
+  onLogout,
+  onOpenQuota,
 }: HeaderProps) {
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-30">
@@ -42,6 +51,60 @@ export function Header({
 
         {/* Action Controls & Navigation */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Quota badge */}
+          {quota && (
+            <button
+              id="btn-quota-status"
+              type="button"
+              onClick={onOpenQuota}
+              title="查看今日切割额度"
+              className={`hidden sm:flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                quota.quota.remaining <= 0
+                  ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100/70'
+                  : 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <Gauge className={`w-3.5 h-3.5 ${quota.quota.remaining <= 0 ? 'text-amber-500' : 'text-blue-600'}`} />
+              <span className="font-mono">
+                今日 {quota.quota.used}/{quota.quota.limit}
+              </span>
+            </button>
+          )}
+
+          {/* Auth area */}
+          {quota?.authenticated && quota.user ? (
+            <>
+              <div
+                id="auth-user-chip"
+                className="hidden md:flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200"
+                title={`4A 账号 ID：${quota.user.id}`}
+              >
+                <UserRound className="w-3.5 h-3.5 text-blue-600" />
+                <span>{quota.user.phone_masked || quota.user.username}</span>
+              </div>
+              <button
+                id="btn-logout"
+                type="button"
+                onClick={onLogout}
+                title="退出登录（仅清除本机登录态）"
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition border border-slate-200"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              id="btn-login"
+              type="button"
+              onClick={onLogin}
+              title="登录后每日可切割 10 次"
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>登录</span>
+            </button>
+          )}
+
           {hasImage && (
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
