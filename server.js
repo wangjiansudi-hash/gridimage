@@ -589,6 +589,42 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // A2A Agent Card（isitagentready a2aAgentCard 检查：需 skills 与 supportedInterfaces）
+    if (route === 'GET /.well-known/agent-card.json') {
+      send(res, 200, {
+        name: 'gridimage',
+        description: '视频号封面切图工具：长图切 1×3/2×3/3×3 宫格、发布顺序命名、ZIP 导出（纯浏览器端处理）',
+        url: 'https://grid.smartbid.site/',
+        version: '1.0.0',
+        capabilities: { slicing: true, zipExport: true },
+        skills: [
+          {
+            id: 'cover-slicing',
+            name: '视频号封面切图',
+            description: '将长图按宫格切为视频号封面子图，支持发布顺序命名与 ZIP 打包下载',
+          },
+        ],
+        supportedInterfaces: [{ type: 'web', url: 'https://grid.smartbid.site/' }],
+        defaultInterface: { type: 'web', url: 'https://grid.smartbid.site/' },
+      });
+      return;
+    }
+
+    // Agent Skills 索引（isitagentready agentSkills 检查：v0.2 与 legacy 两路径）
+    if (route === 'GET /.well-known/agent-skills/index.json' || route === 'GET /.well-known/skills/index.json') {
+      send(res, 200, {
+        skills: [
+          {
+            id: 'cover-slicing',
+            name: '视频号封面切图',
+            description: '上传长图后按宫格切为视频号封面子图（支持发布顺序命名与 ZIP 导出）',
+            url: 'https://grid.smartbid.site/',
+          },
+        ],
+      });
+      return;
+    }
+
     send(res, 404, { error: 'not_found' });
   } catch (err) {
     log(`handler error ${route}: ${err.stack || err.message}`);
