@@ -123,13 +123,16 @@ export async function handleCallback(exchange: (p: { code: string; code_verifier
   }
   const valid =
     attempt !== null && attempt.state === state && Date.now() - attempt.ts < ATTEMPT_MAX_AGE_MS;
-  sessionStorage.removeItem(ATTEMPT_KEY);
+  // attempt 只在成功时清除。失败路径必须保留：它是 initLogin 60s 防回弹闸的依据，
+  // "cookie 兜底有效 + 交换持续失败" 时若在此处清掉，requireLogin 会立刻重新放行，
+  // 造成 4A ←→ 本站 的无限重定向循环。
   if (!valid) return 'callback-fail'; // CSRF/陈旧尝试：静默丢弃，不发起任何跳转
 
   try {
     const res = await exchange({ code, code_verifier: attempt.verifier });
     if (!res?.access_token) throw new Error('exchange 返回缺少 access_token');
     localStorage.setItem(TOKEN_KEY, res.access_token);
+    sessionStorage.removeItem(ATTEMPT_KEY);
     try {
       sessionStorage.removeItem(LOGOUT_FLAG_KEY);
     } catch {
@@ -139,6 +142,7 @@ export async function handleCallback(exchange: (p: { code: string; code_verifier
   } catch (err) {
     console.warn('[auth] 授权码交换失败：', err);
     // 旧 token 还在就沿用（verify 侧会判死过期/被顶的 token），没有则交给调用方 requireLogin
+    //（60s 内 initLogin 会拒绝放行，防止交换持续失败时的重定向循环）
     return 'callback-fail';
   }
 }

@@ -94,7 +94,6 @@ describe('handleCallback', () => {
     const exchange = vi.fn()
     expect(await handleCallback(exchange)).toBe('callback-fail')
     expect(exchange).not.toHaveBeenCalled()
-    expect((globalThis.sessionStorage as Storage).getItem('oauth2_attempt')).toBeNull()
   })
 
   it('陈旧 attempt（>60s）→ callback-fail', async () => {
@@ -120,6 +119,16 @@ describe('handleCallback', () => {
     const exchange = vi.fn().mockRejectedValue(new Error('HTTP 400'))
     expect(await handleCallback(exchange)).toBe('callback-fail')
     expect((globalThis.localStorage as Storage).getItem('access_token')).toBe('old-tok')
+  })
+
+  it('防回弹：交换失败后 attempt 保留，60s 内 initLogin 拒绝放行；成功后清除', async () => {
+    setQuery('?code=abc&state=st-1')
+    await seedAttempt('st-1')
+    const exchange = vi.fn().mockRejectedValue(new Error('HTTP 400'))
+    expect(await handleCallback(exchange)).toBe('callback-fail')
+    // 失败路径 attempt 必须保留——清掉的话 requireLogin 会立刻重新放行形成重定向循环
+    expect((globalThis.sessionStorage as Storage).getItem('oauth2_attempt')).not.toBeNull()
+    expect(await initLogin()).toBe(false)
   })
 })
 
