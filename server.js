@@ -33,6 +33,7 @@ const HOST = process.env.HOST || '127.0.0.1';
 const QUOTA_DB = process.env.QUOTA_DB || path.join(__dirname, 'data', 'usage.json');
 const AUTH_VERIFY_URL = process.env.AUTH_VERIFY_URL || 'https://auth.smartbid.site/api/auth/verify';
 const AUTH_LOGOUT_URL = process.env.AUTH_LOGOUT_URL || 'https://auth.smartbid.site/api/auth/logout';
+const AUTH_TOKEN_URL = process.env.AUTH_TOKEN_URL || 'https://auth.smartbid.site/oauth2/token';
 const ANON_DAILY_LIMIT = parseInt(process.env.ANON_DAILY_LIMIT || '1', 10);
 const USER_DAILY_LIMIT = parseInt(process.env.USER_DAILY_LIMIT || '10', 10);
 const VERIFY_TIMEOUT_MS = parseInt(process.env.VERIFY_TIMEOUT_MS || '5000', 10);
@@ -230,6 +231,26 @@ function send(res, code, obj) {
   res.end(body);
 }
 
+function readJsonBody(req, maxBytes = 16 * 1024) {
+  return new Promise((resolve) => {
+    let raw = '';
+    let overflow = false;
+    req.on('data', (chunk) => {
+      raw += chunk;
+      if (raw.length > maxBytes) overflow = true;
+    });
+    req.on('end', () => {
+      if (overflow) return resolve(null);
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on('error', () => resolve(null));
+  });
+}
+
 function publicUser(user) {
   if (!user) return null;
   return {
@@ -344,6 +365,47 @@ const server = http.createServer(async (req, res) => {
       verifyCache.delete(token);
       negCache.delete(token);
       send(res, 200, { ok: true, four_a_status: fourAStatus });
+      return;
+    }
+
+    // OAuth2 授权码交换代理：前端拿 ?code= 落地后把 {code, code_verifier, redirect_uri}
+    // POST 过来，这里 form 转发 4A /oauth2/token。SPA 不直连 4A——不在其 CORS 白名单，
+    // 且 code_verifier 不必离开本站。redirect_uri 由前端传（须与 authorize 一步精确一致，
+    // dev 为 http://localhost:3000/、生产为 https://grid.smartbid.site/）。
+    // 无状态转发：不缓存、不落库，透传 4A 的 200/4xx。
+    if (route === 'POST /api/auth/token') {
+      const body = await readJsonBody(req);
+      if (
+        !body ||
+        typeof body.code !== 'string' ||
+        typeof body.code_verifier !== 'string' ||
+        typeof body.redirect_uri !== 'string' ||
+        !/^https:\/\/grid\.smartbid\.site\/$|^http:\/\/localhost:3000\/$/.test(body.redirect_uri)
+      ) {
+        send(res, 400, { error: 'invalid_request', detail: '需要 { code, code_verifier, redirect_uri }' });
+        return;
+      }
+      const form = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: body.code,
+        code_verifier: body.code_verifier,
+        client_id: process.env.OAUTH2_CLIENT_ID || 'grid',
+        redirect_uri: body.redirect_uri,
+      });
+      try {
+        const resp = await fetch(AUTH_TOKEN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form,
+          signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+        });
+        const payload = await resp.json().catch(() => ({}));
+        log(`4a token exchange: status=${resp.status}`);
+        send(res, resp.status, payload);
+      } catch (err) {
+        log(`4a token exchange failed: ${err.message}`);
+        send(res, 502, { error: 'auth_unavailable' });
+      }
       return;
     }
 

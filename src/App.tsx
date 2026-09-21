@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { GridConfig, ImageMeta, SliceItem, ExportSettings } from './types';
 import { getEqualSplitLines, calculateSliceBoxes, executeSliceImage } from './utils/imageProcessor';
-import { initSSO, requireLogin, clearToken, logoutEverywhere } from './utils/auth';
+import { initSSO, requireLogin, clearToken, logoutEverywhere, handleCallback, getToken } from './utils/auth';
 import { fetchQuotaSnapshot, consumeQuota, QuotaSnapshot } from './utils/quota';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -59,10 +59,25 @@ export default function App() {
     setQuota(snapshot);
   }, []);
 
-  // 页面加载：恢复 4A 登录态（URL token → localStorage → 跨子域 cookie）并拉取额度
+  // 页面加载：OAuth2 回调处理（?code=）优先，其次 legacy 恢复链（URL token → localStorage →
+  // 跨子域 cookie），然后拉取额度。交换走本站 /api/auth/token 代理（code+verifier 由本站
+  // form 转发 4A /oauth2/token，SPA 不直连 4A——不在其 CORS 白名单，verifier 也不出本站）。
   useEffect(() => {
-    initSSO();
-    refreshQuota();
+    void (async () => {
+      const result = await handleCallback(async ({ code, code_verifier }) => {
+        const res = await fetch('/api/auth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // redirect_uri 须与 authorize 一步精确一致，由前端告知当前 origin（dev/prod 各异）
+          body: JSON.stringify({ code, code_verifier, redirect_uri: location.origin + '/' }),
+        });
+        if (!res.ok) throw new Error(`token 交换失败 HTTP ${res.status}`);
+        return res.json();
+      });
+      if (result === 'not-callback') initSSO();
+      if (result === 'callback-fail' && !getToken()) await requireLogin();
+      refreshQuota();
+    })();
   }, [refreshQuota]);
 
   const handleLogin = useCallback(() => {
