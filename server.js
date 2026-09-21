@@ -3,9 +3,14 @@
  * grid.smartbid.site 配额与 4A 认证 API（零依赖，Node >= 18）
  *
  * 端点：
- *   GET  /api/quota         查询当前身份与今日剩余额度
- *   POST /api/quota/consume 消耗 1 次切割额度（超额返回 429）
- *   GET  /healthz           健康检查
+ *   GET  /                     入口页：带 Link: rel="ai-catalog" 头；Accept: text/markdown 时返回 markdown 站点简介
+ *   GET  /api/quota            查询当前身份与今日剩余额度
+ *   POST /api/quota/consume    消耗 1 次切割额度（超额返回 429）
+ *   POST /api/auth/logout      注销代理（转发 4A /api/auth/logout）
+ *   POST /api/auth/token       OAuth2 授权码交换代理（转发 4A /oauth2/token）
+ *   GET  /.well-known/ai-catalog.json  Agent-Ready API 目录（与 /.well-known/api-catalog 同一份 JSON）
+ *   GET  /.well-known/api-catalog
+ *   GET  /healthz              健康检查
  *
  * 身份：
  *   Authorization: Bearer <sso_token> → 转发 4A /api/auth/verify 验证（带缓存）
@@ -298,6 +303,76 @@ function buildPayload(auth, req) {
   };
 }
 
+// --------------------------------------------------- agent-ready discovery
+// isitagentready.com 整改：如实盘点本服务现有端点，不虚报（切图本身是纯前端能力，不在 API 内）。
+const SITE_URL = 'https://grid.smartbid.site';
+
+const API_CATALOG = {
+  name: 'gridimage',
+  url: SITE_URL,
+  title: '视频号封面切图工具（grid.smartbid.site）',
+  description:
+    '把长封面图切成宫格子图供微信视频号按发布顺序上传。图片处理全部在浏览器 canvas 本地完成，不上传图片；' +
+    '本服务仅提供 4A SSO 认证与每日切割配额（匿名 1 次/日按 IP，登录 10 次/日按 4A 用户，Asia/Shanghai 零点重置）。',
+  endpoints: [
+    {
+      method: 'GET',
+      path: '/api/quota',
+      description:
+        '查询当前身份与今日剩余切割额度。带 Authorization: Bearer <sso_token> 按登录用户计（10 次/日），否则按来源 IP 匿名计（1 次/日）。',
+      auth: 'optional bearer',
+    },
+    {
+      method: 'POST',
+      path: '/api/quota/consume',
+      description: '原子消耗 1 次切割额度（仅前端「开始切图」时调用）；额度耗尽返回 429 {error:"quota_exceeded"}。',
+      auth: 'optional bearer',
+    },
+    {
+      method: 'POST',
+      path: '/api/auth/logout',
+      description:
+        '注销代理：转发 Bearer token 到 4A /api/auth/logout（浏览器直连会被 CORS 拦截），并清除本服务 verify 缓存。',
+      auth: 'required bearer',
+    },
+    {
+      method: 'POST',
+      path: '/api/auth/token',
+      description:
+        'OAuth2 授权码交换代理：接收 {code, code_verifier, redirect_uri}，form 转发到 4A /oauth2/token，透传 4A 状态码；redirect_uri 仅允许 https://grid.smartbid.site/ 或 http://localhost:3000/。',
+      auth: 'none',
+    },
+  ],
+};
+
+const SITE_MARKDOWN = `# grid.smartbid.site — 视频号封面切图工具
+
+把一张长封面图切成 1×3 / 2×3 / 3×3 / 自定义宫格子图，按微信视频号的发布顺序命名，
+配合手机框模拟预览发布后在主页拼回完整海报的效果。
+
+## 工作方式
+
+- 纯前端应用：图片切割、格式/质量导出、ZIP 打包全部在浏览器 \`<canvas>\` 本地完成，**不上传图片**。
+- 服务端只有一个零依赖 Node 小服务，负责 4A SSO 认证与每日切割配额。
+- 机器可读 API 目录：${SITE_URL}/.well-known/ai-catalog.json
+
+## 配额规则（仅约束「开始切图」动作，浏览与上传不受限）
+
+| 身份 | 额度 | 计量 |
+|---|---|---|
+| 匿名 | 1 次/日 | 按来源 IP（\`Cf-Connecting-Ip\`） |
+| 4A 登录用户 | 10 次/日 | 按 4A 数字用户 id |
+
+每日 Asia/Shanghai 零点重置。认证方式：\`Authorization: Bearer <sso_token>\`（4A OAuth2 授权码 + PKCE 签发）。
+
+## API
+
+- \`GET /api/quota\` — 查询当前身份与今日剩余额度
+- \`POST /api/quota/consume\` — 消耗 1 次切割额度（超额返回 429 \`quota_exceeded\`）
+- \`POST /api/auth/logout\` — 注销代理（转发 4A 并清本地验证缓存）
+- \`POST /api/auth/token\` — OAuth2 授权码交换代理（转发 4A \`/oauth2/token\`）
+`;
+
 const server = http.createServer(async (req, res) => {
   req.resume();
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -406,6 +481,46 @@ const server = http.createServer(async (req, res) => {
         log(`4a token exchange failed: ${err.message}`);
         send(res, 502, { error: 'auth_unavailable' });
       }
+      return;
+    }
+
+    // Agent-Ready 入口：始终带 Link: rel="ai-catalog" 指向 API 目录；
+    // Accept 含 text/markdown 时返回 markdown 站点简介，其余照常回静态入口页。
+    // 注意：生产环境 GET / 由 Caddy 静态托管，本路由主要用于探测与直连本服务的场景。
+    if (route === 'GET /') {
+      const link = '</.well-known/ai-catalog.json>; rel="ai-catalog"';
+      const accept = String(req.headers['accept'] || '');
+      if (accept.includes('text/markdown')) {
+        res.writeHead(200, {
+          'Content-Type': 'text/markdown; charset=utf-8',
+          'Cache-Control': 'no-store',
+          Link: link,
+        });
+        res.end(SITE_MARKDOWN);
+        return;
+      }
+      let html = null;
+      try {
+        html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+      } catch {
+        // 静态入口不在同目录时用占位页兜底
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        Link: link,
+      });
+      res.end(
+        html ??
+          `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>grid.smartbid.site</title></head>` +
+          `<body><p>视频号封面切图工具。API 目录见 <a href="/.well-known/ai-catalog.json">/.well-known/ai-catalog.json</a>。</p></body></html>`,
+      );
+      return;
+    }
+
+    // 同一份 JSON 两个路径：ai-catalog.json 给 ARD 探测，api-catalog 给 API Catalog 探测
+    if (route === 'GET /.well-known/ai-catalog.json' || route === 'GET /.well-known/api-catalog') {
+      send(res, 200, API_CATALOG);
       return;
     }
 

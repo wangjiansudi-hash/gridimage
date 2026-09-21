@@ -3,3 +3,5 @@ Allow: /
 
 Sitemap: https://grid.smartbid.site/sitemap.xml
 Host: https://grid.smartbid.site
+
+Content-Signal: search yes, ai-train no, ai-input yes
