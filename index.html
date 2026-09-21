@@ -46,34 +46,115 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Structured data -->
+    <!-- Structured data（由 HeiGe-GEO-SEO gen_schema.py 生成节点后合并为 @graph；
+         节点内容如实：无作者实体与知识图谱条目，故不含 Person/sameAs） -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "视频号多宫格封面智能切割工具",
-      "alternateName": "视频号封面切割工具",
-      "url": "https://grid.smartbid.site/",
-      "description": "专为微信视频号创作者打造的多宫格封面智能切割与排版工具，支持 1x3、2x3、3x3 及自定义长图智能等分切割、分割线微调、无损批量导出 ZIP 与手机主页实时预览。纯前端本地处理，图片零上传。",
-      "applicationCategory": "MultimediaApplication",
-      "operatingSystem": "Any (Web Browser)",
-      "inLanguage": "zh-CN",
-      "browserRequirements": "Requires JavaScript. Requires HTML5 Canvas support.",
-      "featureList": [
-        "1×3 / 2×3 / 3×3 及自定义矩阵切割",
-        "分割线像素级拖拽微调",
-        "视频号发布顺序感知的文件编号",
-        "ZIP 批量打包导出",
-        "手机主页九宫格拼图实时预览",
-        "底部 15% 安全区提示"
-      ],
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "CNY"
-      },
-      "isAccessibleForFree": true,
-      "image": "https://grid.smartbid.site/og-image.png"
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://grid.smartbid.site/#website",
+          "name": "视频号多宫格封面智能切割工具",
+          "url": "https://grid.smartbid.site/",
+          "inLanguage": "zh-CN",
+          "description": "专为微信视频号创作者打造的多宫格封面智能切割与排版工具,支持 1×3、2×3、3×3 及自定义长图切割,纯前端本地处理,图片零上传。",
+          "dateModified": "2026-09-22"
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://grid.smartbid.site/#org",
+          "name": "smartbid.site",
+          "url": "https://grid.smartbid.site/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://grid.smartbid.site/favicon-32.png"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://grid.smartbid.site/#app",
+          "name": "视频号多宫格封面智能切割工具",
+          "alternateName": "视频号封面切割工具",
+          "url": "https://grid.smartbid.site/",
+          "applicationCategory": "MultimediaApplication",
+          "operatingSystem": "Any (Web Browser)",
+          "inLanguage": "zh-CN",
+          "browserRequirements": "Requires JavaScript. Requires HTML5 Canvas support.",
+          "description": "把一张长封面图切成 1×3 三联横幅 / 2×3 六宫格 / 3×3 九宫格 / 自定义宫格子图,按微信视频号发布顺序命名,支持分割线拖拽微调、ZIP 批量导出与手机主页拼图预览。纯前端本地处理,图片不上传。",
+          "featureList": [
+            "1×3 / 2×3 / 3×3 及自定义矩阵切割",
+            "分割线像素级拖拽微调",
+            "视频号发布顺序感知的文件编号",
+            "ZIP 批量打包导出",
+            "手机主页九宫格拼图实时预览",
+            "底部 15% 安全区提示"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "CNY"
+          },
+          "isAccessibleForFree": true,
+          "image": "https://grid.smartbid.site/og-image.png",
+          "dateModified": "2026-09-22",
+          "publisher": { "@id": "https://grid.smartbid.site/#org" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://grid.smartbid.site/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "视频号封面怎么切成九宫格?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "打开 grid.smartbid.site,上传或粘贴长封面图,选择 3×3 宫格(或 1×3 / 2×3 / 自定义行列),拖动分割线微调切口,点击「开始切图」后按编号顺序把子图逐条发布到视频号,主页 3 列流即可拼回完整海报。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "切图会上传我的图片吗?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "不会。切割、导出、ZIP 打包全部在浏览器 canvas 本地完成,图片不上传服务器;服务端只负责登录认证与每日切割配额计数。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "每天能切多少次?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "匿名用户每 IP 每日 1 次,4A 登录用户每日 10 次,每日 Asia/Shanghai 零点重置;浏览与上传不受限,只约束「开始切图」动作。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "为什么要按发布顺序上传?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "视频号主页最新发布的内容出现在 3 列流左上角。工具按「最后切的先发」给文件编号(reverse_profile),逐条上传后子图在主页恰好拼成完整海报。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "支持哪些图片格式和输出尺寸?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "支持 JPG / PNG / WEBP 输入;输出可选原始尺寸 1:1 裁切,或适配视频号的标准比例 3:4(1080×1440)与 6:7(1080×1260)。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "切图安全吗?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "安全。整个处理管线在本地浏览器完成,无服务器图片处理,图片不会离开你的设备。"
+              }
+            }
+          ]
+        }
+      ]
     }
     </script>
   </head>

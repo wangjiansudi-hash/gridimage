@@ -4,6 +4,7 @@
  *
  * 端点：
  *   GET  /                     入口页：带 Link: rel="ai-catalog" 头；Accept: text/markdown 时返回 markdown 站点简介
+ *   GET  /llms.txt             llms.txt 站点摘要（生产由 Caddy 静态直达，此处兜底）
  *   GET  /api/quota            查询当前身份与今日剩余额度
  *   POST /api/quota/consume    消耗 1 次切割额度（超额返回 429）
  *   POST /api/auth/logout      注销代理（转发 4A /api/auth/logout）
@@ -345,33 +346,81 @@ const API_CATALOG = {
   ],
 };
 
+// 站点 markdown 简介（HeiGe GEO 建议结构：答案前置 → 使用步骤 → 配额 → FAQ → 隐私）。
+// 内容如实：能力边界、配额规则、隐私声明均与实际实现一致；不编造数据与来源。
 const SITE_MARKDOWN = `# grid.smartbid.site — 视频号封面切图工具
 
-把一张长封面图切成 1×3 / 2×3 / 3×3 / 自定义宫格子图，按微信视频号的发布顺序命名，
-配合手机框模拟预览发布后在主页拼回完整海报的效果。
+grid.smartbid.site 是一个微信视频号封面切图工具:把一张长封面图切成 1×3 三联横幅 / 2×3 六宫格 / 3×3 九宫格 / 自定义宫格的子图,按视频号发布顺序命名,逐条发布后在主页 3 列流拼回完整海报。图片处理全部在浏览器 canvas 本地完成,**不上传图片**。本文档更新于 2026-09-22。
 
-## 工作方式
+## 如何使用(3 步)
 
-- 纯前端应用：图片切割、格式/质量导出、ZIP 打包全部在浏览器 \`<canvas>\` 本地完成，**不上传图片**。
-- 服务端只有一个零依赖 Node 小服务，负责 4A SSO 认证与每日切割配额。
-- 机器可读 API 目录：${SITE_URL}/.well-known/ai-catalog.json
+1. 打开 ${SITE_URL}/,上传、拖拽或 Ctrl+V 粘贴长封面图(支持 JPG / PNG / WEBP)。
+2. 选择宫格行列(1×3 / 2×3 / 3×3 / 自定义 1~10 行),拖动分割线微调切口,可开启底部 15% 安全区提示(避开视频号标题/按钮遮挡区)。
+3. 点击「开始切图」,文件按发布顺序编号(如 \`01\`、\`02\`…),打包下载 ZIP 后按编号**倒序**逐条发布——最新发布出现在主页左上角,子图恰好拼成完整海报。
 
-## 配额规则（仅约束「开始切图」动作，浏览与上传不受限）
+## 支持的能力
+
+- 宫格切割:1×3 / 2×3 / 3×3 / 自定义行列,支持像素级分割线微调。
+- 输出尺寸:原始尺寸 1:1 裁切,或适配视频号的标准比例 3:4(1080×1440)与 6:7(1080×1260)。
+- 导出:JPEG / PNG / WEBP 可选,单图下载、复制到剪贴板(PNG)或 ZIP 批量打包。
+- 发布预览:手机框模拟视频号主页 3 列流,发布顺序模拟演示。
+
+## 配额规则(仅约束「开始切图」动作,浏览与上传不受限)
 
 | 身份 | 额度 | 计量 |
 |---|---|---|
-| 匿名 | 1 次/日 | 按来源 IP（\`Cf-Connecting-Ip\`） |
+| 匿名 | 1 次/日 | 按来源 IP(\`Cf-Connecting-Ip\`) |
 | 4A 登录用户 | 10 次/日 | 按 4A 数字用户 id |
 
-每日 Asia/Shanghai 零点重置。认证方式：\`Authorization: Bearer <sso_token>\`（4A OAuth2 授权码 + PKCE 签发）。
+每日 Asia/Shanghai 零点重置。认证方式:\`Authorization: Bearer <sso_token>\`(4A OAuth2 授权码 + PKCE 签发)。
+
+## 常见问题
+
+### 切图会上传我的图片吗?
+
+不会。切割、导出、ZIP 打包全部在浏览器 canvas 本地完成,图片不上传服务器;服务端只负责登录认证与每日切割配额计数,不接触图片数据。
+
+### 每天能切多少次?
+
+匿名用户每 IP 每日 1 次,4A 登录用户每日 10 次,每日 Asia/Shanghai 零点重置;浏览与上传不受限,只约束「开始切图」动作。
+
+### 为什么要按发布顺序上传?
+
+视频号主页最新发布的内容出现在 3 列流左上角。工具按「最后切的先发」给文件编号,逐条上传后子图在主页恰好拼成完整海报。
+
+### 切图安全吗?
+
+安全。整个处理管线在本地浏览器完成,无服务器图片处理,图片不会离开你的设备。
+
+## 机器可读资源
+
+- 机器可读 API 目录:${SITE_URL}/.well-known/ai-catalog.json
+- 站点摘要(llms.txt):${SITE_URL}/llms.txt
+- 本文档:\`GET ${SITE_URL}/\` 携带 \`Accept: text/markdown\`
 
 ## API
 
 - \`GET /api/quota\` — 查询当前身份与今日剩余额度
-- \`POST /api/quota/consume\` — 消耗 1 次切割额度（超额返回 429 \`quota_exceeded\`）
-- \`POST /api/auth/logout\` — 注销代理（转发 4A 并清本地验证缓存）
-- \`POST /api/auth/token\` — OAuth2 授权码交换代理（转发 4A \`/oauth2/token\`）
+- \`POST /api/quota/consume\` — 消耗 1 次切割额度(超额返回 429 \`quota_exceeded\`)
+- \`POST /api/auth/logout\` — 注销代理(转发 4A 并清本地验证缓存)
+- \`POST /api/auth/token\` — OAuth2 授权码交换代理(转发 4A \`/oauth2/token\`)
 `;
+
+// llms.txt：优先回磁盘上的静态文件（dist 构建产物 public/llms.txt 会随 rsync 落在
+// 本文件同目录；本地开发则读 public/ 下源文件），都没有时回 null。
+function readLlmsTxt() {
+  for (const p of [
+    path.join(__dirname, 'llms.txt'),
+    path.join(__dirname, 'public', 'llms.txt'),
+  ]) {
+    try {
+      return fs.readFileSync(p, 'utf8');
+    } catch {
+      // 换下一个候选路径
+    }
+  }
+  return null;
+}
 
 const server = http.createServer(async (req, res) => {
   req.resume();
@@ -481,6 +530,22 @@ const server = http.createServer(async (req, res) => {
         log(`4a token exchange failed: ${err.message}`);
         send(res, 502, { error: 'auth_unavailable' });
       }
+      return;
+    }
+
+    // llms.txt 站点摘要：生产环境由 Caddy 静态托管 dist/llms.txt 直达，
+    // 此路由兜底直连本服务的探测场景。
+    if (route === 'GET /llms.txt') {
+      const body = readLlmsTxt();
+      if (body === null) {
+        send(res, 404, { error: 'not_found' });
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(body);
       return;
     }
 
