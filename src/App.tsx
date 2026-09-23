@@ -342,11 +342,17 @@ export default function App() {
         onLogin={handleLogin}
       />
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>微信视频号多宫格封面智能切割工具 · 纯前端本地高效处理 · 零上传安全保障</span>
-          <span className="text-slate-400">支持 1×3、2×3、3×3 及自定义矩阵切割 · 自动顺序打包</span>
+      {/* Footer — 家族统一 footer(设计规范 v1,样式见 src/index.css) */}
+      <footer className="site-footer">
+        <div className="foot-inner">
+          <span className="foot-brand">© 2026 视频号多宫格封面智能切割工具 · 纯前端本地处理,图片不上传 — SmartBid 智书标 · grid.smartbid.site</span>
+          <span className="foot-note">支持 1×3、2×3、3×3 及自定义矩阵切割 · 自动顺序打包</span>
+          <nav className="foot-links">
+            <a href="https://app.smartbid.site" target="_blank" rel="noopener">智标平台</a>
+            <a href="/llms.txt">文档</a>
+            <a href="/.well-known/ai-catalog.json">API 目录</a>
+            <a href="/sitemap.xml">站点地图</a>
+          </nav>
         </div>
       </footer>
     </div>
