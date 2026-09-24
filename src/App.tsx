@@ -59,9 +59,10 @@ export default function App() {
     setQuota(snapshot);
   }, []);
 
-  // 页面加载：OAuth2 回调处理（?code=）优先，其次 legacy 恢复链（URL token → localStorage →
-  // 跨子域 cookie），然后拉取额度。交换走本站 /api/auth/token 代理（code+verifier 由本站
-  // form 转发 4A /oauth2/token，SPA 不直连 4A——不在其 CORS 白名单，verifier 也不出本站）。
+  // 页面加载：OAuth2 回调处理（?code=）优先，其次从 localStorage 恢复登录态
+  // （legacy URL/cookie 兜底已随 P6 收尾删除），然后拉取额度。交换走本站 /api/auth/token
+  // 代理（code+verifier 由本站 form 转发 4A /oauth2/token，SPA 不直连 4A——不在其
+  // CORS 白名单，verifier 也不出本站）。
   useEffect(() => {
     void (async () => {
       const result = await handleCallback(async ({ code, code_verifier }) => {

@@ -1,4 +1,4 @@
-// 4A 统一登录入口——实现已迁至 ./pkce（OAuth2 授权码 + PKCE，legacy 兼容链保留）。
+// 4A 统一登录入口——实现已迁至 ./pkce（OAuth2 授权码 + PKCE；legacy 兜底链已随 P6 收尾删除）。
 // 保留本文件作为薄壳：App.tsx / Header.tsx / QuotaModal.tsx / quota.ts 的 import 不动。
 export {
   getToken,

@@ -156,25 +156,28 @@ describe('PKCE 几何', () => {
   })
 })
 
-describe('initSSO legacy 兼容链', () => {
-  it('?sso_token= 落地 localStorage 并清 URL，解除登出抑制', () => {
-    ;(globalThis.sessionStorage as Storage).setItem('sso_logged_out', '1')
+describe('initSSO legacy 兜底已删除（P6 收尾）', () => {
+  it('?sso_token= URL 参数被忽略：不落地 token、不改写 URL', () => {
     setQuery('?sso_token=t-url&x=1')
-    expect(initSSO()).toBe('t-url')
-    expect((globalThis.localStorage as Storage).getItem('access_token')).toBe('t-url')
-    expect(locationStub.search).toBe('?x=1')
-    expect((globalThis.sessionStorage as Storage).getItem('sso_logged_out')).toBeNull()
+    expect(initSSO()).toBeNull()
+    expect((globalThis.localStorage as Storage).getItem('access_token')).toBeNull()
+    expect(locationStub.search).toBe('?sso_token=t-url&x=1')
   })
 
-  it('登出抑制标志置位时：localStorage 没有 → cookie 兜底被跳过，返回 null', () => {
-    ;(globalThis.sessionStorage as Storage).setItem('sso_logged_out', '1')
+  it('sso_token cookie 被忽略：不落地 token', () => {
     ;(globalThis.document as { cookie: string }).cookie = 'sso_token=t-cookie'
     expect(initSSO()).toBeNull()
+    expect((globalThis.localStorage as Storage).getItem('access_token')).toBeNull()
   })
 
-  it('无抑制标志时 cookie 兜底生效', () => {
-    ;(globalThis.document as { cookie: string }).cookie = 'sso_token=t-cookie'
-    expect(initSSO()).toBe('t-cookie')
-    expect((globalThis.localStorage as Storage).getItem('access_token')).toBe('t-cookie')
+  it('登出抑制标志不再参与恢复：localStorage 有 token 则照常返回', () => {
+    ;(globalThis.sessionStorage as Storage).setItem('sso_logged_out', '1')
+    ;(globalThis.localStorage as Storage).setItem('access_token', 'tok-1')
+    expect(initSSO()).toBe('tok-1')
+  })
+
+  it('localStorage 有 token 时返回之（唯一恢复路径）', () => {
+    ;(globalThis.localStorage as Storage).setItem('access_token', 'tok-1')
+    expect(initSSO()).toBe('tok-1')
   })
 })

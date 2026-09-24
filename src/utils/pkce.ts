@@ -1,6 +1,7 @@
 // OAuth2 授权码 + PKCE 登录（smartbid.site 全家桶）——gridimage 接入。
 // 拷贝自 auth-service/docs/assets/pkce-login.js v1.0（同步时带上版本号，勿就地魔改）。
-// legacy（sso_token cookie / ?sso_token=）在共存期保留，见 APP_INTEGRATION_GUIDE.md §0/§1。
+// legacy 兜底链（?sso_token= URL / sso_token cookie 读）已随 OAuth2 P6 收尾删除；
+// cookie 的*删除*路径保留（登出卫生，见 requireLogin / docs/APP_LOGOUT_GUIDE.md §3）。
 // 4A 只负责"这个人是谁"；配额等业务数据由本 app 自己的服务端维护。
 
 const AUTH_BASE = import.meta.env.VITE_AUTH_BASE || 'https://auth.smartbid.site';
@@ -9,7 +10,7 @@ const LOGOUT_URL = import.meta.env.VITE_LOGOUT_URL || 'https://auth.smartbid.sit
 
 const TOKEN_KEY = 'access_token';
 const SSO_COOKIE = 'sso_token';
-// 登出抑制标志：置位后本标签页不再从共享 cookie 静默恢复登录态（APP_LOGOUT_GUIDE.md §2）
+// 登出抑制标志：置位后本标签页跳 4A 前先删共享 cookie，防 Auto-SSO 回弹（APP_LOGOUT_GUIDE.md §2）
 const LOGOUT_FLAG_KEY = 'sso_logged_out';
 const ATTEMPT_KEY = 'oauth2_attempt';
 /** 授权码 TTL 120s；超过即视为陈旧尝试，静默丢弃（自愈防回弹） */
@@ -66,7 +67,7 @@ export function getToken(): string | null {
 
 /**
  * 跳 4A 授权端点。60s 内已有未完成 attempt 则放弃跳转：
- * cookie 兜底有效 + 交换持续失败时 "requireLogin → 发码 → 交换失败" 会无限回弹，这道闸自愈。
+ * 交换持续失败时 "requireLogin → 发码 → 交换失败" 会无限回弹，这道闸自愈。
  * 返回 true=已发起跳转。
  */
 export async function initLogin(): Promise<boolean> {
@@ -124,7 +125,7 @@ export async function handleCallback(exchange: (p: { code: string; code_verifier
   const valid =
     attempt !== null && attempt.state === state && Date.now() - attempt.ts < ATTEMPT_MAX_AGE_MS;
   // attempt 只在成功时清除。失败路径必须保留：它是 initLogin 60s 防回弹闸的依据，
-  // "cookie 兜底有效 + 交换持续失败" 时若在此处清掉，requireLogin 会立刻重新放行，
+  // 交换持续失败时若在此处清掉，requireLogin 会立刻重新放行，
   // 造成 4A ←→ 本站 的无限重定向循环。
   if (!valid) return 'callback-fail'; // CSRF/陈旧尝试：静默丢弃，不发起任何跳转
 
@@ -147,54 +148,16 @@ export async function handleCallback(exchange: (p: { code: string; code_verifier
   }
 }
 
-// 页面加载时调用一次：legacy 兼容链（?sso_token= URL → localStorage → 跨子域 cookie）。
-// 全部家族应用迁完后本函数整体删除。
+// 页面加载时调用一次（先于本函数的 handleCallback 已处理 ?code= 交换）：
+// 仅从 localStorage 恢复登录态。legacy 兜底链（?sso_token= URL → 跨子域 cookie）
+// 已随 OAuth2 P6 收尾删除——会话恢复只剩 PKCE 交换落地的 token。
 export function initSSO(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  const urlToken = params.get('sso_token');
-
-  if (urlToken) {
-    localStorage.setItem(TOKEN_KEY, urlToken);
-    // 显式登录返回，解除退出抑制
-    try {
-      sessionStorage.removeItem(LOGOUT_FLAG_KEY);
-    } catch {
-      /* ignore */
-    }
-    // 清理 URL，避免 token 留在地址栏/浏览记录里
-    params.delete('sso_token');
-    const newUrl =
-      window.location.pathname +
-      (params.toString() ? '?' + params.toString() : '') +
-      window.location.hash;
-    window.history.replaceState({}, '', newUrl);
-    return urlToken;
-  }
-
-  const existing = getToken();
-  if (existing) return existing;
-
-  // 用户在本站主动退出过：不再从共享 cookie 静默恢复登录态，
-  // 直到重新登录（URL 带 sso_token）或新开标签页会话
-  try {
-    if (sessionStorage.getItem(LOGOUT_FLAG_KEY)) return null;
-  } catch {
-    /* ignore */
-  }
-
-  // 跨子域 cookie 兜底：用户在别的 smartbid 系产品登录过，这里免登录识别
-  const cookieToken = getCookie(SSO_COOKIE);
-  if (cookieToken) {
-    localStorage.setItem(TOKEN_KEY, cookieToken);
-    return cookieToken;
-  }
-
-  return null;
+  return getToken();
 }
 
 export function clearToken(): void {
-  // 审计/登出通知的 token 以 localStorage 为准，共享 cookie 兜底（登出指南 §2）
-  const token = getToken() || getCookie(SSO_COOKIE);
+  // 审计/登出通知的 token 以 localStorage 为准（P6 起不再兜底读共享 cookie）
+  const token = getToken();
   localStorage.removeItem(TOKEN_KEY);
   deleteSsoCookie();
   try {
